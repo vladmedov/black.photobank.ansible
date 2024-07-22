@@ -1,0 +1,1 @@
+certbot_command: "certbot certonly --non-interactive --standalone --agree-tos --email vlad@medov.team -d {{ domain }}"

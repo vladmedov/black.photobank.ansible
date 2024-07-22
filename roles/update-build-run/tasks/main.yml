@@ -1,0 +1,96 @@
+---
+
+- name: Copy photobank.service
+  become: true
+  copy:
+    src: "./files/photobank.service"
+    dest: "/etc/systemd/system/photobank.service"
+
+- name: Delete old source code
+  become: true
+  file:
+    path: /opt/photobank/app
+    state: absent
+
+- name: Create source code directory
+  become: true
+  file:
+    path: /opt/photobank/app
+    state: directory
+
+- name: Clone the repository
+  become: true
+  git:
+    repo: 'git@github.com:vladmedov/mostourism.git'
+    dest: /tmp/photobank-app-clone
+    version: master
+    depth: 1 
+
+- name: Create a git archive from the repository
+  become: true
+  shell: git archive --format=tar master | tar -xf - -C /opt/photobank/app
+  args:
+    chdir: /tmp/photobank-app-clone
+
+- name: Delete repository
+  become: true
+  file:
+    path: /tmp/photobank-app-clone
+    state: absent
+
+- name: Template / Copy docker-compose.yml
+  become: true
+  template:
+    src: ./templates/docker-compose.yml.j2
+    dest: /opt/photobank/docker-compose.yml
+
+- name: Copy Dockerfile for frontend
+  become: true
+  copy:
+    src: "./files/Dockerfile_frontend"
+    dest: "/opt/photobank/app/frontend/Dockerfile"
+
+- name: Copy Dockerfile for backend
+  become: true
+  copy:
+    src: "./files/Dockerfile_backend"
+    dest: "/opt/photobank/app/backend/Dockerfile"
+
+- name: Template / Copy .env_frontend for frontend
+  become: true
+  template:
+    src: "./templates/.env_frontend.j2"
+    dest: "/opt/photobank/app/frontend/.env"
+
+- name: Template / Copy .env_backend for backend
+  become: true
+  template:
+    src: "./templates/.env_backend.j2"
+    dest: "/opt/photobank/app/backend/.env"
+
+- name: Template / Copy nginx.conf
+  become: true
+  template:
+    src: "./templates/nginx.conf.j2"
+    dest: "/opt/photobank/nginx/{{ domain }}.conf"
+
+- name: Ensure the photobank service is stopped
+  systemd:
+    name: photobank
+    state: stopped
+
+- name: Build images
+  become: true
+  shell: "docker-compose build"
+  args:
+    chdir: "/opt/photobank"
+
+- name: Remove all dangling Docker images 
+  become: true 
+  shell: "docker image prune -f"
+
+- name: Ensure the unicraft photobank is started
+  systemd:
+    name: photobank
+    state: started
+    enabled: yes

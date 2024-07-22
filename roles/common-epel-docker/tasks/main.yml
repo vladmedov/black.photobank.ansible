@@ -1,0 +1,24 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install Git, Docker, and Docker Compose
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - git
+    - docker.io
+    - docker-compose
+
+- name: Install Certbot
+  apt:
+    name: certbot
+    state: present
+
+- name: Start Docker service
+  service:
+    name: docker
+    state: started
+    enabled: yes

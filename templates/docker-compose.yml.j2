@@ -1,0 +1,111 @@
+version: '3'
+
+services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/opt/photobank/nginx/{{ domain }}.conf:/etc/nginx/conf.d/{{ domain }}.conf:ro"
+      - "/opt/photobank/nginx/certs:/etc/nginx/certs:ro"
+      - "/opt/photobank/backend_storage:/app/storage:ro"
+    depends_on:
+      - frontend
+      - backend
+      - adminer
+      - redis
+    networks:
+      - web
+
+  frontend:
+    build: ./app/frontend
+    volumes:
+      - /opt/photobank/app/frontend/.env:/app/.env
+    networks:
+      - web
+
+  backend:
+    build: ./app/backend
+    volumes:
+      - /opt/photobank/app/backend/.env:/app/.env
+      - /opt/photobank/backend_storage:/app/storage
+    depends_on:
+      - postgresql
+      - redis
+    networks:
+      - web
+
+  postgresql:
+    image: postgres:latest
+    environment:
+      - POSTGRES_DB=photobank
+      - POSTGRES_USER=photobank
+      - POSTGRES_PASSWORD=439g8eijighuriwqrhfbsd
+    volumes:
+      - /opt/photobank/postgresql/data:/var/lib/postgresql/data
+    networks:
+      - web
+
+  redis:
+    image: redis:latest
+    networks:
+      - web
+
+  backend-queue:
+    build: ./app/backend
+    command: "php artisan queue:work --queue=ftp-scaning,ftp-image-uploading,image-thumbnails-generating"
+    volumes:
+      - /opt/photobank/app/backend/.env:/app/.env
+      - /opt/photobank/backend_storage:/app/storage
+    depends_on:
+      - backend
+    networks:
+      - web
+
+  backend-schedule:
+    build: ./app/backend
+    command: "php artisan schedule:work"
+    volumes:
+      - /opt/photobank/app/backend/.env:/app/.env
+      - /opt/photobank/backend_storage:/app/storage
+    depends_on:
+      - backend
+    networks:
+      - web
+
+#  sftp:
+#    image: atmoz/sftp
+#    volumes:
+#        - /opt/photobank/ftp:/home/photobank
+#    ports:
+#        - "2222:22"
+#    command: photobank:nvi283rhfsgf3bc:1000
+
+  adminer:
+    image: adminer:latest
+    restart: always
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgresql 
+      - ADMINER_DEFAULT_USERNAME=photobank
+      - ADMINER_DEFAULT_DATABASE=photobank
+    depends_on:
+      - postgresql
+    networks:
+      - web
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - HTTP_USER=photobank
+      - HTTP_PASSWORD=i4hfwes382efshc4d
+    depends_on:
+      - redis
+    networks:
+      - web
+
+networks:
+  web:
+    driver: bridge
+

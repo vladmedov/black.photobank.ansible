@@ -1,0 +1,6 @@
+- hosts: all
+  become: true
+  roles:
+    - common-epel-docker
+    - install-folders-tls
+    - update-build-run

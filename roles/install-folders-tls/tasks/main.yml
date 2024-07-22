@@ -1,0 +1,137 @@
+---
+- name: Create root folder
+  become: true
+  file:
+    path: "/opt/photobank"
+    state: directory
+    mode: '0755'
+
+# Nginx folder
+
+- name: Create Nginx folder
+  become: true
+  file:
+    path: "/opt/photobank/nginx"
+    state: directory
+    mode: '0755'
+
+# PostgreSQL folder
+
+- name: Create PostgreSQL folder
+  become: true
+  file:
+    path: "/opt/photobank/postgresql"
+    state: directory
+    mode: '0755'
+
+- name: Create PostgreSQL data
+  become: true
+  file:
+    path: "/opt/photobank/postgresql/data"
+    state: directory
+    mode: '0755'
+
+# Redis folder
+
+- name: Create Redis folder
+  become: true
+  file:
+    path: "/opt/photobank/redis"
+    state: directory
+    mode: '0755'
+
+# FTP folder
+
+#- name: Create FTP folder
+#  become: true
+#  file:
+#    path: "/opt/photobank/ftp"
+#    state: directory
+#    mode: '0755'
+
+# Source folder
+
+- name: Create Source folder 
+  become: true
+  file:
+    path: "/opt/photobank/app"
+    state: directory
+    mode: '0755'
+
+# SSH
+
+- name: Create ~/.ssh directory for root user
+  file:
+    path: "{{ ansible_env.HOME }}/.ssh"
+    state: directory
+  become: true
+
+- name: Copy RSA
+  become: true
+  copy:
+    src: "./files/id_rsa"
+    dest: "~/.ssh/id_rsa"
+    mode: '0600'
+    
+- name: Copy public RSA
+  become: true
+  copy:
+    src: "./files/id_rsa.pub"
+    dest: "~/.ssh/id_rsa.pub"
+    mode: '0644' 
+
+- name: Create an empty known_hosts file if not exists
+  command: touch "{{ ansible_env.HOME }}/.ssh/known_hosts"
+  become: true
+
+- name: Add github.com to known_hosts
+  command: "ssh-keyscan -t rsa github.com"
+  become: true
+  register: keyscan_result
+
+- name: Append ssh-keyscan result to known_hosts file
+  lineinfile:
+    line: "{{ keyscan_result.stdout }}"
+    dest: "{{ ansible_env.HOME }}/.ssh/known_hosts"
+  become: true
+  when: keyscan_result.rc == 0
+    
+# TLS
+
+- name: Ensure TLS certificates directory exists
+  become: true
+  file:
+    path: "/opt/photobank/nginx/certs/{{ domain }}"
+    state: directory
+
+- name: Check if TLS certificates already exist
+  become: true
+  stat:
+    path: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+  register: letsencrypt_status
+
+- name: Obtain TLS certificates with certbot if not already present
+  become: true
+  command: "{{ certbot_command }}"
+  when: not letsencrypt_status.stat.exists
+
+- name: Check if TLS certificates already exist
+  become: true
+  stat:
+    path: "/opt/photobank/nginx/certs/{{ domain }}/fullchain.pem"
+  register: certs_status
+
+- name: Copy TLS certificates to Application directory
+  become: true
+  command: "cp /etc/letsencrypt/live/{{ domain }}/fullchain.pem /opt/photobank/nginx/certs/{{ domain }}/fullchain.pem"
+  when: not certs_status.stat.exists
+
+- name: Copy private key to Application directory
+  become: true
+  command: "cp /etc/letsencrypt/live/{{ domain }}/privkey.pem /opt/photobank/nginx/certs/{{ domain }}/privkey.pem"
+  when: not certs_status.stat.exists
+
+- name: Copy chain to Application directory
+  become: true
+  command: "cp /etc/letsencrypt/live/{{ domain }}/chain.pem /opt/photobank/nginx/certs/{{ domain }}/chain.pem"
+  when: not certs_status.stat.exists
